@@ -101,16 +101,6 @@ export default async function handler(req, res) {
             // 先剥离隐藏图像指令
             cleanText = cleanText.replace(/\[\s*IMAGE\s*:\s*[\s\S]*?\]/ig, "").trim();
 
-            if (process.env.VERCEL) {
-                // 在 Vercel 云端部署时，直接跳过语音生成，避免抛出执行异常
-                res.write(`data: ${JSON.stringify({ type: 'audio_error', id: audioId })}\n\n`);
-                return;
-            }
-
-            const audioDir = path.join(__dirname, '../public/audio');
-            await fs.mkdir(audioDir, { recursive: true }).catch(() => { });
-            const audioPath = path.join(audioDir, `speech_${audioId}.mp3`);
-
             console.log(`\n🔊 [语音流式引擎] 正在通过 HTTP API 生成音频切片 (${cleanText.length}字): ${cleanText}`);
             const p = new Promise(async (resolve) => {
                 try {
@@ -138,9 +128,18 @@ export default async function handler(req, res) {
                     // 非流式模式返回 audio.url（临时下载链接）
                     const audioUrl = ttsResponse.data?.output?.audio?.url;
                     if (audioUrl) {
-                        const audioData = await axios({ url: audioUrl, responseType: 'arraybuffer', timeout: 30000 });
-                        await fs.writeFile(audioPath, Buffer.from(audioData.data));
-                        res.write(`data: ${JSON.stringify({ type: 'audio_result', id: audioId })}\n\n`);
+                        if (process.env.VERCEL) {
+                            // Vercel 无文件系统，直接把 DashScope 临时 URL 传给前端
+                            res.write(`data: ${JSON.stringify({ type: 'audio_result', id: audioId, url: audioUrl })}\n\n`);
+                        } else {
+                            // 本地部署：下载音频文件保存到 public/audio/
+                            const audioDir = path.join(__dirname, '../public/audio');
+                            await fs.mkdir(audioDir, { recursive: true }).catch(() => { });
+                            const audioPath = path.join(audioDir, `speech_${audioId}.mp3`);
+                            const audioData = await axios({ url: audioUrl, responseType: 'arraybuffer', timeout: 30000 });
+                            await fs.writeFile(audioPath, Buffer.from(audioData.data));
+                            res.write(`data: ${JSON.stringify({ type: 'audio_result', id: audioId })}\n\n`);
+                        }
                     } else {
                         console.error("TTS: no audio URL in response", JSON.stringify(ttsResponse.data).slice(0, 500));
                         res.write(`data: ${JSON.stringify({ type: 'audio_error', id: audioId })}\n\n`);

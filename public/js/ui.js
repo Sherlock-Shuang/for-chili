@@ -243,7 +243,8 @@ export const ui = {
                         <div class="audio-length">${displayTime}"</div>
                     `;
                     audioBubble.onclick = () => {
-                        const audio = new Audio("/audio/speech_" + resultItem.id + ".mp3");
+                        const audioSrc = resultItem.url || ("/audio/speech_" + resultItem.id + ".mp3");
+                        const audio = new Audio(audioSrc);
                         audio.play();
                         audioBubble.classList.add('playing');
                         audio.onended = () => audioBubble.classList.remove('playing');
@@ -359,7 +360,8 @@ export const ui = {
                             <div class="audio-length">${displayTime}"</div>
                         `;
                         audioBubble.onclick = () => {
-                            const audio = new Audio("/audio/speech_" + item.id + ".mp3");
+                            const audioSrc = item.url || ("/audio/speech_" + item.id + ".mp3");
+                            const audio = new Audio(audioSrc);
                             audio.play();
                             audioBubble.classList.add('playing');
                             audio.onended = () => audioBubble.classList.remove('playing');
