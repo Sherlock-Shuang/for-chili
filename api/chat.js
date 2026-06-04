@@ -97,6 +97,8 @@ export default async function handler(req, res) {
         const voiceId = await fs.readFile(voiceIdPath, 'utf8').catch(() => null);
         const ttsPromises = [];
 
+        let ttsChain = Promise.resolve();
+
         async function triggerTTS(textChunk, audioId) {
             let cleanText = textChunk.replace(/[\n\r]/g, ' ').trim();
             // 先剥离隐藏图像指令
@@ -107,8 +109,10 @@ export default async function handler(req, res) {
                 return;
             }
 
-            console.log(`\n🔊 [语音流式引擎] 正在通过 HTTP API 生成音频切片 (${cleanText.length}字): ${cleanText}`);
-            const p = new Promise(async (resolve) => {
+            console.log(`\n🔊 [语音流式引擎] 正在排队等待生成音频切片 (${cleanText.length}字)...`);
+            
+            const p = ttsChain.then(async () => {
+                console.log(`\n🔊 [语音流式引擎] 开始通过 HTTP API 生成音频切片 (${cleanText.length}字): ${cleanText}`);
                 try {
                     const cleanApiKey = (process.env.LLM_API_KEY || "").replace(/["']/g, "").trim();
                     // DashScope 原生 HTTP TTS API（纯 HTTP，不走 WebSocket）
@@ -159,9 +163,10 @@ export default async function handler(req, res) {
                     console.error("TTS HTTP API error:", e.response?.status, e.response?.data ? JSON.stringify(e.response.data).slice(0, 500) : e.message);
                     res.write(`data: ${JSON.stringify({ type: 'audio_error', id: audioId })}\n\n`);
                 }
-                resolve();
             });
-            ttsPromises.push(p);
+            
+            ttsChain = p; // 更新链条，让下一个请求等当前请求完成
+            ttsPromises.push(p); // 依然保留到 ttsPromises 里，为了请求结束时统一 await 确保所有声音都生成完
         }
 
         function processSegment(segment) {
