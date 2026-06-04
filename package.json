@@ -1,0 +1,17 @@
+{
+  "name": "distilled-memory",
+  "version": "1.0.0",
+  "description": "Distilled Memory Web App",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "reindex": "node scripts/reindex_memories.js"
+  },
+  "dependencies": {
+    "axios": "^1.15.0",
+    "dotenv": "^17.4.2",
+    "express": "^4.18.2"
+  }
+}

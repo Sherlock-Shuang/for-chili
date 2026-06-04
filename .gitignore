@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# Environment Variables
+.env
+.env.local
+
+# Temp and OS files
+.DS_Store
+Thumbs.db
+*.log
+temp_speech*.mp3
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# Large audio or temp files (Optional, feel free to comment out if you want to push wav files)
+# *.wav

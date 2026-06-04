@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>辣椒</title>
+    <!-- 引入类似 Google Fonts 的 Roboto / Inter 字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-top">
+                <div class="menu-btn sidebar-menu-btn">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="#5f6368">
+                        <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="sidebar-actions">
+                <button class="new-chat-btn">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="#444746">
+                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                    </svg>
+                    发起新对话
+                </button>
+                <button class="sidebar-item">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="#444746">
+                        <path
+                            d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm4.24 16L12 15.45 7.77 18l1.12-4.81-3.73-3.23 4.92-.42L12 5l1.92 4.53 4.92.42-3.73 3.23L16.23 18z" />
+                    </svg>
+                    我的内容
+                </button>
+            </div>
+
+
+
+            <div id="chat-list" class="sidebar-section chats">
+                <div class="section-title">对话</div>
+                <!-- 本地存储的对话将动态渲染在这里 -->
+            </div>
+
+            <div class="sidebar-bottom">
+                <div class="sidebar-item" id="settings-btn">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="#444746">
+                        <path
+                            d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z" />
+                    </svg>
+                    设置和帮助
+                </div>
+            </div>
+            <!-- 保留系统日志结构，但是隐藏在后台除非用特殊方式呼出，或者设为极低透明度 -->
+            <div id="system-log" class="system-log"></div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <header class="topbar">
+                <div class="top-rights" style="justify-content:flex-start;">
+                    <div class="menu-btn" id="main-menu-btn" style="display: none; margin-right: 8px;">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="#5f6368">
+                            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+                        </svg>
+                    </div>
+                    <div class="logo">辣椒</div>
+                </div>
+                <div class="chat-title" id="top-chat-title"></div>
+                <div class="top-rights">
+                    <!-- 导出分享对话记录 -->
+                    <button id="export-chat-btn" class="upgrade-btn">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                        </svg>
+                        导出回忆
+                    </button>
+                    <div class="user-avatar">A</div>
+                </div>
+            </header>
+
+            <div class="scroll-wrapper">
+                <!-- 初始欢迎界面 -->
+                <div id="welcome-container" class="welcome-container">
+                    <h1 class="welcome-title">
+                        <span class="gradient-text">Alex，你好</span><br>
+                        需要我为你做些什么？
+                    </h1>
+                    <p style="color: var(--text-tertiary); font-size: 16px; margin-top: -30px; letter-spacing: 1px;">——
+                        承载了几乎所有回忆</p>
+                    <p style="color: var(--text-tertiary); font-size: 14px; margin-top: 10px; opacity: 0.8; font-style: italic; letter-spacing: 1px;">
+                        可以聊我们之前经常聊到的话题，或者谈诗文，谈谈这些日子……
+                    </p>
+                </div>
+
+                <!-- 核心聊天对话流 -->
+                <div id="chat-container" class="chat-container hidden">
+                    <!-- Messages 将被动态注入在此处 -->
+                </div>
+            </div>
+
+            <!-- 底部交互输入区 -->
+            <div id="float-input-wrapper" class="input-container-wrapper centered-state">
+                <div id="input-area" class="input-area">
+                    <div class="input-tools left">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="#444746">
+                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                        </svg>
+                    </div>
+                    <div class="input-wrapper">
+                        <input type="text" id="user-input" autocomplete="off" spellcheck="false"
+                            placeholder="问问 辣椒">
+                    </div>
+                    <div class="input-tools right">
+                        <button id="send-btn" class="send-btn">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="legal-text">辣椒 是一款 AI 工具，其回答未必正确无误。</div>
+            </div>
+
+            <!-- 王家卫风格的复古遮罩 -->
+            <div id="cinematic-overlay">
+                <div id="cinematic-text"></div>
+            </div>
+            <script>
+                // 防闪烁：如果是老访客，直接在一开始就毙掉这个覆盖层，让主页面瞬间呈现
+                if (localStorage.getItem('gemini_intro_played')) {
+                    document.getElementById('cinematic-overlay').style.display = 'none';
+                }
+            </script>
+
+
+            <!-- 记忆核心设置 Modal -->
+            <div id="settings-modal" class="modal-overlay hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>修改底盘回忆与提示词系统</h2>
+                        <button id="close-settings-btn" class="close-btn">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- 第一层：菜单导航总览 -->
+                        <div id="settings-menu" class="settings-menu">
+                            <div class="menu-item" data-target="settings-role">
+                                <h3>角色设定</h3>
+                                <p>定义该智能体（辣椒）的基础身份、性格与聊天的整体风格。</p>
+                            </div>
+                            <div class="menu-item" data-target="settings-memory">
+                                <h3>自定义回忆 (Custom Memory)</h3>
+                                <p>编辑你们核心事件与底座记忆，这是它灵魂深处的烙印。</p>
+                            </div>
+                            <div class="menu-item" data-target="settings-constraints">
+                                <h3>行为约束</h3>
+                                <p>修改输出的字数限制以及其他隐藏系统设定的触发规则（如图像引擎）。</p>
+                            </div>
+                        </div>
+
+                        <!-- 第二层：内容编辑器 -->
+                        <div id="settings-detail" class="settings-detail hidden">
+                            <div class="detail-header">
+                                <button id="back-to-menu-btn" class="back-btn">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                        <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                                    </svg>
+                                    返回板块列表
+                                </button>
+                                <span id="detail-title">编辑板块</span>
+                            </div>
+
+                            <div class="detail-content" id="settings-role" style="display:none;">
+                                <textarea id="prompt-role" class="settings-textarea" spellcheck="false"></textarea>
+                            </div>
+
+                            <div class="detail-content" id="settings-memory" style="display:none;">
+                                <textarea id="prompt-memory" class="settings-textarea" spellcheck="false"></textarea>
+                            </div>
+
+                            <div class="detail-content" id="settings-constraints" style="display:none;">
+                                <textarea id="prompt-constraints" class="settings-textarea"
+                                    spellcheck="false"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="reset-prompt-btn" class="secondary-btn">恢复默认</button>
+                        <button id="save-prompt-btn" class="primary-btn">保存并应用生效</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 图片放大查看灯箱 -->
+            <div id="image-lightbox" class="lightbox-overlay hidden">
+                <img id="lightbox-img" src="" alt="放大查看">
+                <div class="lightbox-close">&times;</div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ES Module 结构的主入口 -->
+    <script type="module" src="./js/main.js"></script>
+</body>
+
+</html>
