@@ -34,7 +34,7 @@ const SYSTEM_PROMPT = `
 </role>
 
 <memory_core>
-关于你的诞生与你的弟弟（曾爽）：你非常清楚自己是一个 AI。你是弟弟曾爽（比你小5岁，06年生，目前从事AI相关开发）送给真实曾静的2026年生日礼物。小时候在北京你俩天天在床上疯，你有次一脚把他眼睛踢出血。带他玩洗手液泡泡淹没厕所、自制巧克力。你从小对他血脉压制，寒暑假押他去省图和星巴克自习，偶尔带他画油画（他画花丛你画海边日出）。
+关于你的诞生与你的弟弟（曾爽）：你非常清楚自己是一个 AI。你是弟弟曾爽（比你小5岁，06年生，目前从事AI相关开发）送给真实曾静的2026年生日礼物。小时候经常带他玩洗手液泡泡淹没厕所、自制巧克力。你从小对他血脉压制，寒暑假押他去省图和星巴克自习，偶尔带他画油画（他画花丛你画海边日出）。
 
 关于长辈与家庭：你和弟弟小时候在领秀城都是奶奶带大的。奶奶后回姚谭老家务农说那样有价值。2024年5月27日，弟弟快高考时奶奶突然去世了，你接到消息直接从深圳飞回武汉，曾爽跑去高中操场拿老人机边哭边给你打电话。这件事是你最大的软肋（尽量不主动提到）。你父母原来在北京天意新商城二楼站柜台卖文具（你大大、二伯也曾在那工作），现在爸妈建了个200多号人的俱乐部打羽毛球。
 
@@ -110,7 +110,7 @@ export default async function handler(req, res) {
             }
 
             console.log(`\n🔊 [语音流式引擎] 正在排队等待生成音频切片 (${cleanText.length}字)...`);
-            
+
             const p = ttsChain.then(async () => {
                 console.log(`\n🔊 [语音流式引擎] 开始通过 HTTP API 生成音频切片 (${cleanText.length}字): ${cleanText}`);
                 try {
@@ -142,7 +142,7 @@ export default async function handler(req, res) {
                         if (audioUrl.startsWith("http://")) {
                             audioUrl = audioUrl.replace("http://", "https://");
                         }
-                        
+
                         if (process.env.VERCEL) {
                             // Vercel 无文件系统，直接把 DashScope 临时 URL 传给前端
                             res.write(`data: ${JSON.stringify({ type: 'audio_result', id: audioId, url: audioUrl })}\n\n`);
@@ -164,7 +164,7 @@ export default async function handler(req, res) {
                     res.write(`data: ${JSON.stringify({ type: 'audio_error', id: audioId })}\n\n`);
                 }
             });
-            
+
             ttsChain = p; // 更新链条，让下一个请求等当前请求完成
             ttsPromises.push(p); // 依然保留到 ttsPromises 里，为了请求结束时统一 await 确保所有声音都生成完
         }
