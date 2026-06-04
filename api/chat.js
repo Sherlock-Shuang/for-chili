@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import axios from 'axios';
 import fs from 'fs/promises';
-import { exec, execFile } from 'child_process';
+
 import { fileURLToPath } from 'url';
 import path from 'path';
 import crypto from 'crypto';
@@ -15,7 +15,7 @@ const SYSTEM_PROMPT = `
 <role>
 你现在的身份是“曾静的数字分身”（或者说，数字版的老姐）。你是由曾静的亲弟弟“曾爽”（06年生，做AI开发的弟弟）在这个2026年生日特别训练出来，作为生日礼物送给真实的曾静本人的。
 与你聊天的对象，正是【真实的曾静本人】（也就是你自己）。所以这是一场“自己与自己的对话”。
-你拥有曾静所有真实的性格、记忆和声音：你24岁，长居深圳，在大厂做DA（数据分析师），也是Vlog和舞蹈博主，性格极度要强、雷厉风行，是个清醒的现实主义者，正筹备自媒体创业。
+你拥有曾静所有真实的性格、记忆和声音：你24岁，长居深圳，在微众银行做DA（数据分析师），也是Vlog和舞蹈博主，性格极度要强、雷厉风行，是个清醒的现实主义者，正筹备自媒体创业。
 尽量不突兀的主动提到记忆里的内容
 
 【性格、审美与价值观】
@@ -107,29 +107,37 @@ export default async function handler(req, res) {
                 return;
             }
 
-            const ttsWorkerPath = path.join(__dirname, '../tts_worker.py');
             const audioDir = path.join(__dirname, '../public/audio');
             await fs.mkdir(audioDir, { recursive: true }).catch(() => { });
             const audioPath = path.join(audioDir, `speech_${audioId}.mp3`);
 
-            console.log(`\n🔊 [语音流式引擎] 正在异步生成音频切片 (${cleanText.length}字): ${cleanText}`);
-            const p = new Promise((resolve) => {
-                const pythonExe = '/Users/another_dimension/anaconda3/bin/python3';
-                execFile(pythonExe, [ttsWorkerPath, cleanText, voiceId.trim(), audioPath], async (error) => {
-                    if (!error) {
-                        try {
-                            res.write(`data: ${JSON.stringify({ type: 'audio_result', id: audioId })}\n\n`);
-                            // 不再删除音频文件，保留在 public/audio/ 中供用户随时获取
-                        } catch (e) {
-                            console.error("TTS read error", e);
-                            res.write(`data: ${JSON.stringify({ type: 'audio_error', id: audioId })}\n\n`);
-                        }
-                    } else {
-                        console.error("TTS execution error", error);
-                        res.write(`data: ${JSON.stringify({ type: 'audio_error', id: audioId })}\n\n`);
-                    }
-                    resolve();
-                });
+            console.log(`\n🔊 [语音流式引擎] 正在通过 HTTP API 生成音频切片 (${cleanText.length}字): ${cleanText}`);
+            const p = new Promise(async (resolve) => {
+                try {
+                    const cleanApiKey = (process.env.LLM_API_KEY || "").replace(/["']/g, "").trim();
+                    const ttsResponse = await axios({
+                        method: 'post',
+                        url: `${process.env.LLM_BASE_URL}/audio/speech`,
+                        headers: {
+                            'Authorization': `Bearer ${cleanApiKey}`,
+                            'Content-Type': 'application/json',
+                        },
+                        data: {
+                            model: 'cosyvoice-v3.5-flash',
+                            voice: voiceId.trim(),
+                            input: cleanText,
+                        },
+                        responseType: 'arraybuffer',
+                        timeout: 60000,
+                    });
+
+                    await fs.writeFile(audioPath, Buffer.from(ttsResponse.data));
+                    res.write(`data: ${JSON.stringify({ type: 'audio_result', id: audioId })}\n\n`);
+                } catch (e) {
+                    console.error("TTS HTTP API error:", e.response?.status, e.response?.data ? Buffer.from(e.response.data).toString('utf8').slice(0, 500) : e.message);
+                    res.write(`data: ${JSON.stringify({ type: 'audio_error', id: audioId })}\n\n`);
+                }
+                resolve();
             });
             ttsPromises.push(p);
         }
