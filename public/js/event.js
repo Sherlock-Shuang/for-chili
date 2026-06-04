@@ -36,7 +36,28 @@ const audioQueue = new AudioQueue();
 export function setupEventListeners() {
     const userInput = document.getElementById('user-input');
 
+    // 主题切换逻辑
+    const themeSelector = document.getElementById('theme-selector');
+    if (themeSelector) {
+        // 读取本地存储
+        const savedTheme = localStorage.getItem('app-theme') || 'wechat';
+        themeSelector.value = savedTheme;
+        if (savedTheme === 'wechat') {
+            document.body.classList.add('wechat-style');
+        } else {
+            document.body.classList.remove('wechat-style');
+        }
 
+        themeSelector.addEventListener('change', (e) => {
+            const theme = e.target.value;
+            localStorage.setItem('app-theme', theme);
+            if (theme === 'wechat') {
+                document.body.classList.add('wechat-style');
+            } else {
+                document.body.classList.remove('wechat-style');
+            }
+        });
+    }
 
     // 侧边栏折叠/展开联动
     const toggleSidebar = () => {
@@ -93,40 +114,163 @@ export function setupEventListeners() {
                 return;
             }
             
-            let exportText = "=== 辣椒的回忆录 ===\n\n";
-            exportText += `导出时间：${new Date().toLocaleString()}\n`;
-            exportText += "===========================\n\n";
-            
-            currentMessages.forEach(msg => {
-                const roleName = msg.role === 'user' ? '曾爽' : '老姐';
-                exportText += `【${roleName}】:\n${msg.content}\n\n`;
-            });
-            
-            // 尝试调用系统的原生分享面板
+            exportBtn.innerHTML = "打包中...";
+            exportBtn.style.pointerEvents = 'none';
+
+            let exportHtml = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>辣椒的回忆录</title>
+<style>
+body { font-family: -apple-system, system-ui, sans-serif; background: #f3f3f3; margin: 0; padding: 20px; }
+.message { display: flex; margin-bottom: 20px; align-items: flex-start; }
+.message.user { flex-direction: row-reverse; }
+.avatar { width: 40px; height: 40px; border-radius: 4px; flex-shrink: 0; display: flex; justify-content: center; align-items: center; font-weight: bold; color: white; }
+.assistant-avatar { background: #07c160; margin-right: 12px; }
+.user-avatar { background: #1aad19; margin-left: 12px; }
+.bubble-container { display: flex; flex-direction: column; gap: 8px; max-width: 70%; align-items: flex-start; }
+.message.user .bubble-container { align-items: flex-end; }
+.msg-content { padding: 10px 14px; border-radius: 8px; font-size: 16px; word-wrap: break-word; line-height: 1.5; }
+.message.user .msg-content { background-color: #95ec69; color: #000; }
+.message.assistant .msg-content { background-color: #fff; color: #000; }
+.audio-bubble { cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none; }
+.text-translation { margin-top: 4px; font-size: 14px; color: #888; background: #e8e8e8; padding: 8px 12px; border-radius: 6px; display: none; }
+.playing { opacity: 0.7; }
+</style>
+</head>
+<body>
+<div style="text-align: center; color: #888; margin-bottom: 30px; font-size: 14px;">
+    === 辣椒的回忆录 ===<br>
+    导出时间：${new Date().toLocaleString()}<br>
+    <small>提示：点击气泡播放语音，右键/长按语音转文字</small>
+</div>
+<div id="chat-container">
+`;
+
+            for (const msg of currentMessages) {
+                exportHtml += `<div class="message ${msg.role}">`;
+                if (msg.role === 'assistant') {
+                    exportHtml += `<div class="avatar assistant-avatar">老姐</div>`;
+                } else {
+                    exportHtml += `<div class="avatar user-avatar">我</div>`;
+                }
+
+                exportHtml += `<div class="bubble-container">`;
+
+                if (msg.role === 'assistant' && msg.items && msg.items.length > 0) {
+                    for (const item of msg.items) {
+                        if (item.type === 'text') {
+                            exportHtml += `<div class="msg-content">${item.content}</div>`;
+                        } else if (item.type === 'audio_result' || item.type === 'audio_error') {
+                            const ph = msg.items.find(x => x.type === 'audio_placeholder' && x.id === item.id);
+                            let displayTime = ph ? Math.max(1, Math.round(ph.length / 3)) : 5;
+                            let textContent = ph ? ph.text : "";
+                            let base64 = "";
+
+                            if (item.type === 'audio_result') {
+                                try {
+                                    const res = await fetch(`/audio/speech_${item.id}.mp3`);
+                                    if (res.ok) {
+                                        const blob = await res.blob();
+                                        base64 = await new Promise(r => {
+                                            const reader = new FileReader();
+                                            reader.onload = () => r(reader.result.split(',')[1]);
+                                            reader.readAsDataURL(blob);
+                                        });
+                                    }
+                                } catch(e){}
+                            }
+
+                            if (item.type === 'audio_error') {
+                                exportHtml += `<div class="msg-content audio-bubble"><div style="color:red; font-size:12px;">生成失败</div></div>`;
+                            } else {
+                                const audioStr = base64 ? `data:audio/mp3;base64,${base64}` : '';
+                                exportHtml += `
+                                <div style="display:flex; flex-direction:column; align-items:flex-start;">
+                                    <div class="msg-content audio-bubble" onclick="playAudio(this, '${audioStr}')" oncontextmenu="toggleText(event, this)">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                                        <div>${displayTime}"</div>
+                                    </div>
+                                    <div class="text-translation">${textContent}</div>
+                                </div>
+                                `;
+                            }
+                        }
+                    }
+                } else {
+                    exportHtml += `<div class="msg-content">${msg.content}</div>`;
+                }
+
+                if (msg.imageUrl) {
+                    exportHtml += `<img src="${msg.imageUrl}" style="max-width: 200px; border-radius: 8px; margin-top: 8px;">`;
+                }
+
+                exportHtml += `</div></div>\n`;
+            }
+
+            exportHtml += `
+</div>
+<script>
+function playAudio(el, src) {
+    if (!src) return;
+    if (el.audioObj) {
+        el.audioObj.play();
+        return;
+    }
+    const audio = new Audio(src);
+    el.audioObj = audio;
+    audio.play();
+    el.classList.add('playing');
+    audio.onended = () => el.classList.remove('playing');
+}
+function toggleText(e, el) {
+    e.preventDefault();
+    const txt = el.nextElementSibling;
+    if (txt && txt.classList.contains('text-translation')) {
+        txt.style.display = txt.style.display === 'block' ? 'none' : 'block';
+    }
+}
+</script>
+</body>
+</html>`;
+
             if (navigator.share) {
                 try {
-                    const file = new File([exportText], `辣椒_回忆录.txt`, { type: "text/plain" });
+                    const file = new File([exportHtml], `辣椒_回忆录.html`, { type: "text/html" });
                     await navigator.share({
                         title: '辣椒的回忆录',
-                        text: '这是我和老姐的一段记忆交流...',
+                        text: '这是一段包含原声语音的记忆记录...',
                         files: [file]
                     });
-                    return; // 如果分享成功，就不用走下面的下载逻辑了
                 } catch (e) {
-                    console.log("分享接口调用取消或设备不支持该文件类型分享，回滚至本地下载");
+                    const url = URL.createObjectURL(new Blob([exportHtml], { type: "text/html" }));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `辣椒_回忆录.html`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
                 }
+            } else {
+                const url = URL.createObjectURL(new Blob([exportHtml], { type: "text/html" }));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `辣椒_回忆录.html`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
             }
-            
-            // 回滚：标准文件下载
-            const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `辣椒_回忆录_${new Date().getTime()}.txt`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+
+            exportBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                </svg>
+            `;
+            exportBtn.style.pointerEvents = 'auto';
         });
     }
 
@@ -312,7 +456,7 @@ function switchChat(id) {
 
     ui.clearChat();
     currentMessages.forEach(msg => {
-        ui.appendMessageImmediate(msg.content, msg.role, msg.imageUrl);
+        ui.appendMessageImmediate(msg.content, msg.role, msg.imageUrl, msg.items);
     });
 
     ui.setChatTitle(chat.title);
@@ -408,13 +552,10 @@ async function handleUserMessage(text, inputField) {
     const customPromptForReply = localStorage.getItem('custom_system_prompt');
     
     const responseObj = await sendMessage(uploadMessages, customPromptForReply, (data) => {
-        if (data.type === 'text') {
-            ui.updateStreamingMessage(contentDiv, data.content);
+        if (data.type === 'text' || data.type === 'audio_placeholder' || data.type === 'audio_result' || data.type === 'audio_error') {
+            ui.updateStreamingMessage(contentDiv, data);
         } else if (data.type === 'image') {
             ui.appendImageToStreamingMessage(contentDiv, data.url);
-        } else if (data.type === 'audio') {
-            ui.addSystemLog(`VOICE_SYNTHESIS_CHUNK_RECEIVED`);
-            audioQueue.enqueue(data.base64);
         }
     });
 
@@ -423,7 +564,7 @@ async function handleUserMessage(text, inputField) {
 
     ui.removeLoading(); // 销毁等待动画
 
-    currentMessages.push({ role: 'assistant', content: reply, imageUrl: imageUrl });
+    currentMessages.push({ role: 'assistant', content: reply, items: contentDiv.items, imageUrl: imageUrl });
     storage.saveChat({ id: currentChatId, title: title, messages: currentMessages });
 
     isInputLocked = false;

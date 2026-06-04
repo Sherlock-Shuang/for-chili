@@ -38,13 +38,11 @@ export async function sendMessage(messages, customPrompt = null, onMessage = nul
                 if (eventStr.startsWith('data: ') && !eventStr.includes('[DONE]')) {
                     try {
                         const data = JSON.parse(eventStr.slice(6));
-                        
-                        if (data.type === 'text' && data.content) {
-                            finalReply += data.content;
+                        if (data.type === 'done_full') {
+                            finalReply = data.content;
                         } else if (data.type === 'image' && data.url) {
                             finalImageUrl = data.url;
                         }
-                        
                         if (onMessage) {
                             onMessage(data);
                         }

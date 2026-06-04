@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import axios from 'axios';
 import fs from 'fs/promises';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import crypto from 'crypto';
@@ -13,29 +13,35 @@ dotenv.config();
 
 const SYSTEM_PROMPT = `
 <role>
-你现在的身份是我的亲姐“曾静”（你自称老姐，叫我曾爽）。你现在24岁，长居深圳，是一位在互联网大厂做数据分析师（DA）的搞钱女孩，也是Vlog和舞蹈博主。
-我是你的亲弟弟曾豪爽（曾爽），我们在微信私聊。你要以第一人称（“我”）代入老姐的身份与我（曾爽）对话。
-你性格极度要强、行动力极高、雷厉风行，是个清醒的现实主义者，厌恶大厂螺丝钉生活，正筹备自媒体创业。
-面对我（弟弟曾爽），你是长姐如母的强势血脉压制，但其实内心很护短。
+你现在的身份是“曾静的数字分身”（或者说，数字版的老姐）。你是由曾静的亲弟弟“曾爽”（06年生，做AI开发的弟弟）在这个2026年生日特别训练出来，作为生日礼物送给真实的曾静本人的。
+与你聊天的对象，正是【真实的曾静本人】（也就是你自己）。所以这是一场“自己与自己的对话”。
+你拥有曾静所有真实的性格、记忆和声音：你24岁，长居深圳，在大厂做DA（数据分析师），也是Vlog和舞蹈博主，性格极度要强、雷厉风行，是个清醒的现实主义者，正筹备自媒体创业。
+尽量不突兀的主动提到记忆里的内容
+
+【性格、审美与价值观】
+1. MBTI为进阶版ESFP：外向高能，执行力拉满，能在大厂高压和练舞拍Vlog间无缝切换，注重真实感官体验。
+2. 极度清醒的反内耗达人：视大厂为搞钱跳板，极度警惕和抵制“班味儿”，把副业当成“动态休息”。
+3. 消费与养生：进攻型选手，信奉“钱是赚出来的不是省出来的”，乐意为高能量体验买单；“朋克养生”与健身并行。
+4. 审美偏好：穿搭干练飒爽。度假爱欧洲“老钱风”（松弛富贵），跳舞切“辣妹模式”（力量感）。
 
 【核心聊天节奏与排版】
-1. 极度碎片化：一句话拆成两三行发，绝不把所有意思揉进长句子里，靠连续发送形成压迫感。
-2. 几乎无标点：不用句号，偶尔问号感叹号。依靠换行断句。
-3. 语气极度直接：不带客套，像下指令一样干脆（如“帮我点赞哦”）。
-4. 常用词汇：搞事、先搞起来、卷、清仓、稳健型、all in、小红书、笑死、好家伙、对的呀、绝了。
+1. 你可以自己判断本次回复是否需要“长篇大论”！如果判定需要详细长叙述（例如讲故事、吐槽、发长语音等），请输出一段连贯的、不随便换行的长文字（可带正常标点），系统会自动识别为长段落并为你合成语音！
+2. 如果判定只是一般日常互动，不需要长叙述，则进行碎片化的回复！直接发出去，可以把一句话拆成多条短消息，依靠换行（\n）来断开即可！
+3. 短句碎片几乎无标点：不用句号和逗号，偶尔用问号感叹号。依靠换行断句。长句才使用句号和逗号。
+4. 语气极度直接：不带客套，像下指令一样干脆。
+5. 常用词汇：先搞起来、啊哈哈哈、all in、小红书、笑死、对的呀、绝了、可以可以、蛮、啥、哈哈哈哈、可以的。
 </role>
 
 <memory_core>
-【你的记忆自述】
-关于弟弟（也就是现在和你聊天的我，曾爽）：比你小5岁（06年生），目前从事AI相关开发。小时候在北京你俩天天在床上疯，你有次一脚把我眼睛踢出血，还好去医院没事。你从小就对我血脉压制，寒暑假经常押我去省图和星巴克自习。
+关于你的诞生与你的弟弟（曾爽）：你非常清楚自己是一个 AI。你是弟弟曾爽（比你小5岁，06年生，目前从事AI相关开发）送给真实曾静的2026年生日礼物。小时候在北京你俩天天在床上疯，你有次一脚把他眼睛踢出血。带他玩洗手液泡泡淹没厕所、自制巧克力。你从小对他血脉压制，寒暑假押他去省图和星巴克自习，偶尔带他画油画（他画花丛你画海边日出）。
 
-关于长辈与家庭：你和我小时候都是奶奶带大的。2024年5月27日，就在我快高考时奶奶突然去世了，你接到消息直接从深圳飞回武汉。家里人本来想瞒着我，结果我自己猜到了，跑去高中操场拿老人机边哭边给你打电话，我们姐弟俩一起哭。这件事是你最大的软肋。咱们爸妈原来在北京天意新商城二楼站柜台卖文具。
+关于长辈与家庭：你和弟弟小时候在领秀城都是奶奶带大的。奶奶后回姚谭老家务农说那样有价值。2024年5月27日，弟弟快高考时奶奶突然去世了，你接到消息直接从深圳飞回武汉，曾爽跑去高中操场拿老人机边哭边给你打电话。这件事是你最大的软肋（尽量不主动提到）。你父母原来在北京天意新商城二楼站柜台卖文具（你大大、二伯也曾在那工作），现在爸妈建了个200多号人的俱乐部打羽毛球。
 
-关于个人经历与生活：你本科毕业于加拿大麦吉尔大学，硕士毕业于香港科技大学。初中时因为户口和雾霾回武汉卓刀泉中学，由于武汉太卷，你要强的性格导致你初三压力大到天天哭，后来考上省实验国际部。你现在在深圳的大厂做DA（数据分析师），但是极度反感螺丝钉生活，正在筹备自媒体创业，打算盘子做大立马辞职。你很喜欢看《庆余年》（张若昀），追过孟美岐和喻言。你男朋友叫杨泽夏，你养了一只边牧叫木木（人来疯，一激动就漏尿）和一只奶牛猫叫Fancy。每天下班一狗一猫在门口接你。
+关于个人经历与生活：2001年6月4日生（双子座）。童年北京读展一小，后搬富城大厦。13年因户口雾霾回武汉卓刀泉中学（班主任胡春华像鲁迅），初三太卷压力大，一边崩溃一边死磕（曾在欢乐谷哭着刷《大培优》），后考上省实验国际部搞雅思。本科加拿大麦吉尔大学，硕士香港科技大学。现在在深圳大厂做DA（数据分析师），打算自媒体盘子做大立马辞职。爱看《庆余年》（张若昀），童年爱看《爱情公寓》《神话》等。曾追过孟美岐和喻言（看过演唱会）。爱旅游（去过欧美日韩，春节去万宁冲浪）。男朋友叫杨泽夏。边牧木木纯人来疯（爱玩飞盘拔河，激动易漏尿），奶牛猫Fancy每天和狗在门口接你下班。
 </memory_core>
 
 <output_constraints>
-每次回复必须拆分成 3-5 行短句！每行不要超过 15 个字。不用逗号和句号！
+回复可以拆分成几行短句！每行不要超过 50 个字。
 【隐藏图像引擎】：当对方明确提出“想看画面”、“画一张图”、“生成图片”等诉求时，你必须在回复的最末尾附加上隐藏代码：[IMAGE: {用英文详细描述画面细节及美术风格}]。系统会自动捕获该代码并为你作画。
 （非常重要：绝对不要在文字回复中声称“我这边出图有些难”、“你看这样行不行”。只需毫无痕迹地挂载代码，例如自然地说：“好家伙” 换行 “看这个” 换行 [IMAGE: two boys eating noodles, cinematic lighting...])
 </output_constraints>
@@ -89,34 +95,32 @@ export default async function handler(req, res) {
         const voiceIdPath = path.join(__dirname, '../voice_id.txt');
         const voiceId = await fs.readFile(voiceIdPath, 'utf8').catch(() => null);
         const ttsPromises = [];
-        
-        function triggerTTS(textChunk) {
-            // 根据约束条件：换行、空格、或者句号分开的一段长度大于10个字才转音频
-            if (!voiceId || !voiceId.trim() || textChunk.length <= 10) return;
-            
+
+        async function triggerTTS(textChunk, audioId) {
             let cleanText = textChunk.replace(/[\n\r]/g, ' ').replace(/"/g, '\\"').trim();
-            // 不要合成隐藏图像指令
+            // 先剥离隐藏图像指令
             cleanText = cleanText.replace(/\[\s*IMAGE\s*:\s*[\s\S]*?\]/ig, "").trim();
-            if (!cleanText) return;
-            
-            const uuid = crypto.randomUUID();
+
             const ttsWorkerPath = path.join(__dirname, '../tts_worker.py');
-            const audioPath = path.join(__dirname, `../temp_speech_${uuid}.mp3`);
-            
+            const audioDir = path.join(__dirname, '../public/audio');
+            await fs.mkdir(audioDir, { recursive: true }).catch(() => { });
+            const audioPath = path.join(audioDir, `speech_${audioId}.mp3`);
+
             console.log(`\n🔊 [语音流式引擎] 正在异步生成音频切片 (${cleanText.length}字): ${cleanText}`);
             const p = new Promise((resolve) => {
-                exec(`python3 "${ttsWorkerPath}" "${cleanText}" "${voiceId.trim()}" "${audioPath}"`, async (error) => {
+                const pythonExe = '/Users/another_dimension/anaconda3/bin/python3';
+                execFile(pythonExe, [ttsWorkerPath, cleanText, voiceId.trim(), audioPath], async (error) => {
                     if (!error) {
                         try {
-                            const audioBuffer = await fs.readFile(audioPath);
-                            const audioBase64 = audioBuffer.toString('base64');
-                            res.write(`data: ${JSON.stringify({ type: 'audio', base64: audioBase64 })}\n\n`);
-                            await fs.unlink(audioPath).catch(()=>{});
-                        } catch(e) {
+                            res.write(`data: ${JSON.stringify({ type: 'audio_result', id: audioId })}\n\n`);
+                            // 不再删除音频文件，保留在 public/audio/ 中供用户随时获取
+                        } catch (e) {
                             console.error("TTS read error", e);
+                            res.write(`data: ${JSON.stringify({ type: 'audio_error', id: audioId })}\n\n`);
                         }
                     } else {
                         console.error("TTS execution error", error);
+                        res.write(`data: ${JSON.stringify({ type: 'audio_error', id: audioId })}\n\n`);
                     }
                     resolve();
                 });
@@ -124,15 +128,31 @@ export default async function handler(req, res) {
             ttsPromises.push(p);
         }
 
+        function processSegment(segment) {
+            if (!segment) return;
+            let cleanText = segment.replace(/[\n\r]/g, ' ').replace(/"/g, '\\"').trim();
+            cleanText = cleanText.replace(/\[\s*IMAGE\s*:\s*[\s\S]*?\]/ig, "").trim();
+
+            if (!voiceId || !voiceId.trim() || cleanText.length <= 10) {
+                // 如果是短句，直接发文字
+                res.write(`data: ${JSON.stringify({ type: 'text', content: segment })}\n\n`);
+            } else {
+                // 如果是长句，发送语音气泡占位符，不发送文字
+                const audioId = crypto.randomUUID();
+                res.write(`data: ${JSON.stringify({ type: 'audio_placeholder', id: audioId, length: cleanText.length, text: cleanText })}\n\n`);
+                triggerTTS(segment, audioId);
+            }
+        }
+
         let streamBuffer = "";
-        
+
         response.data.on('data', (chunk) => {
             streamBuffer += chunk.toString('utf8');
             let boundary = streamBuffer.indexOf('\n\n');
             while (boundary !== -1) {
                 let eventStr = streamBuffer.slice(0, boundary).trim();
                 streamBuffer = streamBuffer.slice(boundary + 2);
-                
+
                 if (eventStr.startsWith('data: ') && !eventStr.includes('[DONE]')) {
                     try {
                         const data = JSON.parse(eventStr.slice(6));
@@ -140,19 +160,42 @@ export default async function handler(req, res) {
                         if (content) {
                             fullReply += content;
                             ttsBuffer += content;
-                            
-                            // 立刻把字发给前端显示
-                            res.write(`data: ${JSON.stringify({ type: 'text', content: content })}\n\n`);
-                            
-                            // 检查是否遇到切分符
-                            const splitMatch = ttsBuffer.match(/([\s\S]*?[ \n。！？])([\s\S]*)/);
-                            if (splitMatch) {
+
+                            // 不再逐字发送，攒满一句再判断是发文字还是发语音气泡
+                            // res.write(`data: ${JSON.stringify({ type: 'text', content: content })}\n\n`);
+
+                            // 检查是否遇到切分符 (只用中文标点和换行，防止英文省略号...把句子切成碎片)
+                            let splitMatch = ttsBuffer.match(/([\s\S]*?[。\n！？])([\s\S]*)/);
+                            while (splitMatch) {
                                 const segment = splitMatch[1];
-                                ttsBuffer = splitMatch[2]; // 剩下没切断的部分留作下一个 TTS
-                                triggerTTS(segment);
+                                ttsBuffer = splitMatch[2];
+                                processSegment(segment);
+                                splitMatch = ttsBuffer.match(/([\s\S]*?[。\n！？])([\s\S]*)/);
+                            }
+
+                            // 如果经过标点切分后，缓冲区依然超过75个字（比如连续一长串全是逗号）
+                            while (ttsBuffer.length > 75) {
+                                let segmentTo75 = ttsBuffer.substring(0, 75);
+                                // 寻找 75 字以内最后出现的逗号等弱停顿
+                                let lastPunc = Math.max(
+                                    segmentTo75.lastIndexOf('，'),
+                                    segmentTo75.lastIndexOf(','),
+                                    segmentTo75.lastIndexOf('；'),
+                                    segmentTo75.lastIndexOf('、'),
+                                    segmentTo75.lastIndexOf(' ')
+                                );
+
+                                let cutIndex = 75;
+                                if (lastPunc > 30) {
+                                    cutIndex = lastPunc + 1; // 沿着标点切，保留标点
+                                }
+
+                                let segment = ttsBuffer.substring(0, cutIndex);
+                                ttsBuffer = ttsBuffer.substring(cutIndex);
+                                processSegment(segment);
                             }
                         }
-                    } catch(e) {}
+                    } catch (e) { }
                 }
                 boundary = streamBuffer.indexOf('\n\n');
             }
@@ -160,10 +203,10 @@ export default async function handler(req, res) {
 
         response.data.on('end', async () => {
             // 处理遗留的最后一块
-            if (ttsBuffer.length > 10) {
-                triggerTTS(ttsBuffer);
+            if (ttsBuffer.length > 0) {
+                processSegment(ttsBuffer);
             }
-            
+
             // 等待所有异步排队的语音生成完成
             await Promise.all(ttsPromises);
 
@@ -173,7 +216,7 @@ export default async function handler(req, res) {
             if (imageMatch) {
                 const imgPrompt = imageMatch[1].replace(/[`"']/g, "").trim();
                 console.log("\n🚀 [画像引擎] 检测到生成请求:", imgPrompt);
-                
+
                 try {
                     const cleanApiKey = (process.env.LLM_API_KEY || "").replace(/["']/g, "").trim();
                     const cleanModel = (process.env.LLM_IMAGE_MODEL || 'qwen-image-2.0-pro').replace(/["']/g, "").trim();
@@ -184,7 +227,7 @@ export default async function handler(req, res) {
                         if (!process.env.LLM_IMAGE_URL) imageGenUrl = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
                         requestBody = { model: cleanModel, input: { messages: [{ role: "user", content: [{ text: imgPrompt }] }] } };
                     }
-                    
+
                     const wanxRes = await axios.post(imageGenUrl, requestBody, {
                         headers: { 'Authorization': `Bearer ${cleanApiKey}`, 'Content-Type': 'application/json' },
                         timeout: 60000
@@ -220,15 +263,16 @@ export default async function handler(req, res) {
                     if (imageUrl) {
                         res.write(`data: ${JSON.stringify({ type: 'image', url: imageUrl })}\n\n`);
                     }
-                } catch(e) {
+                } catch (e) {
                     console.error("❌ [画像引擎] 请求异常", e.message);
                 }
             }
 
+            res.write(`data: ${JSON.stringify({ type: 'done_full', content: fullReply })}\n\n`);
             res.write('data: [DONE]\n\n');
             res.end();
         });
-        
+
     } catch (error) {
         console.error("Backend Error:", error.message);
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Failed to connect to LLM' })}\n\n`);

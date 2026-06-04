@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="./css/style.css">
 </head>
 
-<body>
+<body class="wechat-style">
     <div id="app">
         <!-- 侧边栏 -->
         <aside class="sidebar">
@@ -61,16 +61,26 @@
         <!-- 主内容区 -->
         <main class="main-content">
             <header class="topbar">
-                <div class="top-rights" style="justify-content:flex-start;">
-                    <div class="menu-btn" id="main-menu-btn" style="display: none; margin-right: 8px;">
-                        <svg viewBox="0 0 24 24" width="24" height="24" fill="#5f6368">
-                            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
-                        </svg>
+                <div class="top-rights" style="justify-content:flex-start; flex-direction:column; align-items:flex-start;">
+                    <div style="display:flex; align-items:center;">
+                        <div class="menu-btn" id="main-menu-btn" style="display: none; margin-right: 8px;">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="#5f6368">
+                                <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+                            </svg>
+                        </div>
+                        <div class="logo">辣椒</div>
                     </div>
-                    <div class="logo">辣椒</div>
+                    <div id="top-typing-status" style="display: none; font-size: 12px; color: var(--text-tertiary); font-weight: normal; margin-top: 2px;">对方正在输入中...</div>
                 </div>
-                <div class="chat-title" id="top-chat-title"></div>
+                <div class="chat-title-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                    <div class="chat-title" id="top-chat-title"></div>
+                </div>
                 <div class="top-rights">
+                    <!-- 新增样式切换 -->
+                    <select id="theme-selector" class="upgrade-btn" style="margin-right: 8px; background: transparent; color: inherit; border: 1px solid var(--text-tertiary); cursor: pointer; outline: none; border-radius: 12px; padding: 4px 8px;">
+                        <option value="wechat">微信风格</option>
+                        <option value="gemini">Gemini风格</option>
+                    </select>
                     <!-- 导出分享对话记录 -->
                     <button id="export-chat-btn" class="upgrade-btn">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -86,13 +96,13 @@
                 <!-- 初始欢迎界面 -->
                 <div id="welcome-container" class="welcome-container">
                     <h1 class="welcome-title">
-                        <span class="gradient-text">Alex，你好</span><br>
-                        需要我为你做些什么？
+                        <span class="gradient-text">老姐，生日快乐</span><br>
+                        欢迎来到属于你的数字时空
                     </h1>
                     <p style="color: var(--text-tertiary); font-size: 16px; margin-top: -30px; letter-spacing: 1px;">——
-                        承载了几乎所有回忆</p>
+                        这不仅仅是一份礼物，更是一台承载记忆的时光机</p>
                     <p style="color: var(--text-tertiary); font-size: 14px; margin-top: 10px; opacity: 0.8; font-style: italic; letter-spacing: 1px;">
-                        可以聊我们之前经常聊到的话题，或者谈诗文，谈谈这些日子……
+                        我让 AI 学习了你的碎碎念和记忆。随便聊点什么吧，比如木木、Fancy，或者过去的那些日子……
                     </p>
                 </div>
 

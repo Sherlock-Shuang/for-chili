@@ -19,3 +19,4 @@ temp_speech*.mp3
 
 # Large audio or temp files (Optional, feel free to comment out if you want to push wav files)
 # *.wav
+public/audio/

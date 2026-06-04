@@ -41,6 +41,13 @@ export const ui = {
         if (topTitle) topTitle.textContent = title;
     },
 
+    setTypingStatus(isTyping) {
+        const typingStatus = document.getElementById('top-typing-status');
+        if (typingStatus) {
+            typingStatus.style.display = isTyping ? 'block' : 'none';
+        }
+    },
+
     renderSidebarChats(chats, currentChatId, onChatClick) {
         if (!this.chatListContainer) return;
         
@@ -123,8 +130,14 @@ export const ui = {
 
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${role}`;
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'msg-content';
+        msgDiv.style.display = 'none'; // Initially hidden
+        
+        const bubbleContainer = document.createElement('div');
+        bubbleContainer.className = 'bubble-container';
+        bubbleContainer.style.display = 'flex';
+        bubbleContainer.style.flexDirection = 'column';
+        bubbleContainer.style.gap = '8px';
+        bubbleContainer.style.maxWidth = '100%';
 
         if (role === 'assistant') {
             const avatar = document.createElement('div');
@@ -132,26 +145,167 @@ export const ui = {
             avatar.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
             msgDiv.appendChild(avatar);
         }
-        msgDiv.appendChild(contentDiv);
+        
+        msgDiv.appendChild(bubbleContainer);
         this.chatContainer.appendChild(msgDiv);
         this.scrollToBottom();
-        return contentDiv;
+        
+        return {
+            msgDiv: msgDiv,
+            container: bubbleContainer,
+            items: [], // Array of event data
+            processingIndex: 0,
+            isProcessing: false,
+            currentTextBuffer: "",
+            currentBubble: null
+        };
     },
 
-    updateStreamingMessage(contentDiv, text) {
-        let currentText = contentDiv.textContent + text;
-        currentText = currentText.replace(/\[\s*IMAGE\s*:\s*[\s\S]*?/ig, "").trim();
-        contentDiv.textContent = currentText;
-        this.scrollToBottom();
+    updateStreamingMessage(streamState, eventData) {
+        streamState.items.push(eventData);
+        if (!streamState.isProcessing) {
+            this.processStreamQueue(streamState);
+        }
     },
 
-    appendImageToStreamingMessage(contentDiv, imageUrl) {
+    async processStreamQueue(streamState) {
+        streamState.isProcessing = true;
+        this.isStreamProcessing = true;
+        this.setTypingStatus(true);
+
+        while (true) {
+            if (streamState.processingIndex >= streamState.items.length) {
+                break;
+            }
+
+            if (streamState.msgDiv.style.display === 'none') {
+                streamState.msgDiv.style.display = 'flex';
+                this.scrollToBottom();
+            }
+
+            const item = streamState.items[streamState.processingIndex];
+
+            if (item.type === 'text') {
+                if (!streamState.currentBubble) {
+                    streamState.currentBubble = document.createElement('div');
+                    streamState.currentBubble.className = 'msg-content';
+                    streamState.container.appendChild(streamState.currentBubble);
+                }
+
+                let targetText = item.content;
+                let currentText = streamState.currentBubble.textContent;
+
+                if (currentText.length < targetText.length) {
+                    streamState.currentBubble.textContent = targetText.substring(0, currentText.length + 1);
+                    this.scrollToBottom();
+                    await new Promise(r => setTimeout(r, 20)); 
+                } else {
+                    streamState.processingIndex++;
+
+                    const delayMs = Math.floor(Math.random() * 2000) + 1000;
+                    await new Promise(r => setTimeout(r, delayMs));
+
+                    streamState.currentBubble = null;
+                }
+            } else if (item.type === 'audio_placeholder') {
+                let displayTime = Math.max(1, Math.round(item.length / 3));
+                
+                // 模拟发送语音时的“录音时间”等待
+                await new Promise(r => setTimeout(r, displayTime * 1000));
+
+                // 阻塞等待真实音频生成完毕，保持严格的顺序
+                let resultItem = null;
+                while (true) {
+                    resultItem = streamState.items.find(x => (x.type === 'audio_result' || x.type === 'audio_error') && x.id === item.id);
+                    if (resultItem) {
+                        break;
+                    }
+                    await new Promise(r => setTimeout(r, 200));
+                }
+                resultItem.handled = true; // 标记已处理，防止后续重复渲染
+
+                const audioBubble = document.createElement('div');
+                audioBubble.className = 'msg-content audio-bubble';
+                audioBubble.id = `audio-bubble-${item.id}`;
+                
+                if (resultItem.type === 'audio_error') {
+                    audioBubble.innerHTML = `
+                        <div class="audio-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></div>
+                        <div class="audio-length">${displayTime}"</div>
+                        <span style="color:#fa5151; font-size:12px; margin-left: 8px;">生成失败</span>
+                    `;
+                } else {
+                    audioBubble.style.cursor = 'pointer';
+                    audioBubble.style.backgroundColor = 'var(--wechat-bubble-bg)';
+                    audioBubble.style.color = '#000';
+                    audioBubble.innerHTML = `
+                        <div class="audio-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></div>
+                        <div class="audio-length">${displayTime}"</div>
+                    `;
+                    audioBubble.onclick = () => {
+                        const audio = new Audio("/audio/speech_" + resultItem.id + ".mp3");
+                        audio.play();
+                        audioBubble.classList.add('playing');
+                        audio.onended = () => audioBubble.classList.remove('playing');
+                    };
+                    audioBubble.oncontextmenu = (e) => {
+                        e.preventDefault();
+                        const existingText = audioBubble.parentNode.querySelector(`#text-trans-${item.id}`);
+                        if (existingText) {
+                            existingText.remove();
+                        } else {
+                            const textDiv = document.createElement('div');
+                            textDiv.id = `text-trans-${item.id}`;
+                            textDiv.className = 'msg-content';
+                            textDiv.style.marginTop = '4px';
+                            textDiv.style.fontSize = '14px';
+                            textDiv.style.color = 'var(--text-secondary)';
+                            textDiv.style.backgroundColor = 'var(--bg-secondary)';
+                            textDiv.textContent = item.text || "转文字失败";
+                            audioBubble.parentNode.insertBefore(textDiv, audioBubble.nextSibling);
+                            this.scrollToBottom();
+                        }
+                    };
+                }
+
+                audioBubble.style.display = 'flex';
+                audioBubble.style.alignItems = 'center';
+                audioBubble.style.gap = '6px';
+                
+                streamState.container.appendChild(audioBubble);
+                this.scrollToBottom();
+
+                streamState.currentBubble = null;
+                streamState.processingIndex++;
+                
+                const delayMs = Math.floor(Math.random() * 1000) + 500;
+                await new Promise(r => setTimeout(r, delayMs));
+            } else if (item.type === 'audio_result' || item.type === 'audio_error') {
+                // 如果是占位符已经处理过了，这里直接跳过
+                streamState.processingIndex++;
+            } else {
+                streamState.processingIndex++;
+            }
+        }
+        
+        streamState.isProcessing = false;
+        this.isStreamProcessing = false;
+        if (this.isStreamFinished) {
+            this.setTypingStatus(false);
+        }
+    },
+
+    async appendImageToStreamingMessage(streamState, imageUrl) {
+        // 等待文字彻底打完再出图
+        while (streamState.isProcessing) {
+            await new Promise(r => setTimeout(r, 100));
+        }
         const imgContainer = this.createImageContainer(imageUrl);
-        contentDiv.appendChild(imgContainer);
+        streamState.currentBubble.appendChild(imgContainer);
         this.scrollToBottom();
     },
 
-    appendMessageImmediate(content, role, imageUrl = null) {
+    appendMessageImmediate(content, role, imageUrl = null, items = null) {
         // 无打字机动画的加载，用于渲染历史记录
         if (this.welcomeContainer && !this.welcomeContainer.classList.contains('hidden')) {
             this.welcomeContainer.classList.add('hidden');
@@ -163,31 +317,106 @@ export const ui = {
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${role}`;
         
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'msg-content';
-        // 渲染时不显示隐藏的图像代码
-        contentDiv.textContent = content.replace(/\[\s*IMAGE\s*:\s*[\s\S]*?\]/ig, "").trim();
-
+        const assistantAvatarHtml = '<div class="assistant-avatar"><svg viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>';
+        
         if (role === 'assistant') {
-            const avatar = document.createElement('div');
-            avatar.className = 'assistant-avatar';
-            avatar.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
-            msgDiv.appendChild(avatar);
-            
-            if (imageUrl) {
-                const imgContainer = this.createImageContainer(imageUrl);
-                contentDiv.appendChild(imgContainer);
-
-            }
-        } else {
-            // 用户消息：增加编辑按钮
-            const editBtn = document.createElement('div');
-            editBtn.className = 'edit-btn';
-            editBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
-            msgDiv.appendChild(editBtn);
+            msgDiv.innerHTML = assistantAvatarHtml;
         }
 
-        msgDiv.appendChild(contentDiv);
+        let contentWrapper;
+        if (role === 'assistant' && items && items.length > 0) {
+            contentWrapper = document.createElement('div');
+            contentWrapper.className = 'bubble-container';
+            contentWrapper.style.display = 'flex';
+            contentWrapper.style.flexDirection = 'column';
+            contentWrapper.style.gap = '8px';
+            contentWrapper.style.maxWidth = '100%';
+
+            for (const item of items) {
+                if (item.type === 'text') {
+                    const txtBubble = document.createElement('div');
+                    txtBubble.className = 'msg-content';
+                    txtBubble.textContent = item.content;
+                    contentWrapper.appendChild(txtBubble);
+                } else if (item.type === 'audio_result' || item.type === 'audio_error') {
+                    const ph = items.find(x => x.type === 'audio_placeholder' && x.id === item.id);
+                    let displayTime = ph ? Math.max(1, Math.round(ph.length / 3)) : 5;
+                    
+                    const audioBubble = document.createElement('div');
+                    audioBubble.className = 'msg-content audio-bubble';
+                    if (item.type === 'audio_error') {
+                        audioBubble.innerHTML = `
+                            <div class="audio-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></div>
+                            <div class="audio-length">${displayTime}"</div>
+                            <span style="color:#fa5151; font-size:12px; margin-left: 8px;">生成失败</span>
+                        `;
+                    } else {
+                        audioBubble.style.cursor = 'pointer';
+                        audioBubble.style.backgroundColor = 'var(--wechat-bubble-bg)';
+                        audioBubble.style.color = '#000';
+                        audioBubble.innerHTML = `
+                            <div class="audio-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></div>
+                            <div class="audio-length">${displayTime}"</div>
+                        `;
+                        audioBubble.onclick = () => {
+                            const audio = new Audio("/audio/speech_" + item.id + ".mp3");
+                            audio.play();
+                            audioBubble.classList.add('playing');
+                            audio.onended = () => audioBubble.classList.remove('playing');
+                        };
+                        audioBubble.oncontextmenu = (e) => {
+                            e.preventDefault();
+                            const existingText = audioBubble.parentNode.querySelector(`#text-trans-${item.id}`);
+                            if (existingText) {
+                                existingText.remove();
+                            } else {
+                                const textDiv = document.createElement('div');
+                                textDiv.id = `text-trans-${item.id}`;
+                                textDiv.className = 'msg-content';
+                                textDiv.style.marginTop = '4px';
+                                textDiv.style.fontSize = '14px';
+                                textDiv.style.color = 'var(--text-secondary)';
+                                textDiv.style.backgroundColor = 'var(--bg-secondary)';
+                                textDiv.textContent = ph ? ph.text : "转文字失败";
+                                audioBubble.parentNode.insertBefore(textDiv, audioBubble.nextSibling);
+                            }
+                        };
+                    }
+                    audioBubble.style.display = 'flex';
+                    audioBubble.style.alignItems = 'center';
+                    audioBubble.style.gap = '6px';
+                    contentWrapper.appendChild(audioBubble);
+                }
+            }
+            if (imageUrl) {
+                const imgContainer = this.createImageContainer(imageUrl);
+                contentWrapper.appendChild(imgContainer);
+            }
+        } else {
+            contentWrapper = document.createElement('div');
+            contentWrapper.className = 'msg-content';
+            contentWrapper.textContent = content ? content.replace(/\[\s*IMAGE\s*:\s*[\s\S]*?\]/ig, "").trim() : "";
+            
+            if (role === 'assistant' && imageUrl) {
+                const imgContainer = this.createImageContainer(imageUrl);
+                contentWrapper.appendChild(imgContainer);
+            } else if (role !== 'assistant') {
+                const editBtn = document.createElement('div');
+                editBtn.className = 'edit-btn';
+                editBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
+                msgDiv.appendChild(editBtn);
+            }
+        }
+
+        msgDiv.appendChild(contentWrapper);
+        
+        if (role !== 'assistant') {
+            const userAvatar = document.createElement('div');
+            userAvatar.className = 'user-avatar-msg hidden-default';
+            userAvatar.textContent = '我';
+            msgDiv.appendChild(userAvatar);
+        }
+
         this.chatContainer.appendChild(msgDiv);
         this.scrollToBottom();
     },
@@ -284,6 +513,7 @@ export const ui = {
     },
 
     showLoading() {
+        this.isStreamFinished = false;
         if (this.welcomeContainer && !this.welcomeContainer.classList.contains('hidden')) {
             this.welcomeContainer.classList.add('hidden');
             this.chatContainer.classList.remove('hidden');
@@ -291,25 +521,15 @@ export const ui = {
             if (floatInput) floatInput.classList.remove('centered-state');
         }
 
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `message assistant loading-message`;
-        msgDiv.id = 'loading-bubble';
-        
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'msg-content';
-        contentDiv.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
-
-        const avatar = document.createElement('div');
-        avatar.className = 'assistant-avatar';
-        avatar.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
-        
-        msgDiv.appendChild(avatar);
-        msgDiv.appendChild(contentDiv);
-        this.chatContainer.appendChild(msgDiv);
+        this.setTypingStatus(true);
         this.scrollToBottom();
     },
 
     removeLoading() {
+        this.isStreamFinished = true;
+        if (!this.isStreamProcessing) {
+            this.setTypingStatus(false);
+        }
         const loader = document.getElementById('loading-bubble');
         if (loader) {
             loader.remove();
