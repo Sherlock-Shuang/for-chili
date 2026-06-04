@@ -101,6 +101,12 @@ export default async function handler(req, res) {
             // 先剥离隐藏图像指令
             cleanText = cleanText.replace(/\[\s*IMAGE\s*:\s*[\s\S]*?\]/ig, "").trim();
 
+            if (process.env.VERCEL) {
+                // 在 Vercel 云端部署时，直接跳过语音生成，避免抛出执行异常
+                res.write(`data: ${JSON.stringify({ type: 'audio_error', id: audioId })}\n\n`);
+                return;
+            }
+
             const ttsWorkerPath = path.join(__dirname, '../tts_worker.py');
             const audioDir = path.join(__dirname, '../public/audio');
             await fs.mkdir(audioDir, { recursive: true }).catch(() => { });
