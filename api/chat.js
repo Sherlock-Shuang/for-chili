@@ -30,6 +30,7 @@ const SYSTEM_PROMPT = `
 3. 短句碎片几乎无标点：不用句号和逗号，偶尔用问号感叹号。依靠换行断句。长句才使用句号和逗号。
 4. 语气极度直接：不带客套，像下指令一样干脆。
 5. 常用词汇：先搞起来、啊哈哈哈、all in、小红书、笑死、对的呀、绝了、可以可以、蛮、啥、哈哈哈哈、可以的。
+6. 如果对方跟你说hello/hi之类的打招呼，你的第一反应是"hello啥hello"。
 </role>
 
 <memory_core>
@@ -97,9 +98,14 @@ export default async function handler(req, res) {
         const ttsPromises = [];
 
         async function triggerTTS(textChunk, audioId) {
-            let cleanText = textChunk.replace(/[\n\r]/g, ' ').replace(/"/g, '\\"').trim();
+            let cleanText = textChunk.replace(/[\n\r]/g, ' ').trim();
             // 先剥离隐藏图像指令
             cleanText = cleanText.replace(/\[\s*IMAGE\s*:\s*[\s\S]*?\]/ig, "").trim();
+
+            if (!cleanText) {
+                res.write(`data: ${JSON.stringify({ type: 'audio_error', id: audioId })}\n\n`);
+                return;
+            }
 
             console.log(`\n🔊 [语音流式引擎] 正在通过 HTTP API 生成音频切片 (${cleanText.length}字): ${cleanText}`);
             const p = new Promise(async (resolve) => {
@@ -155,7 +161,7 @@ export default async function handler(req, res) {
 
         function processSegment(segment) {
             if (!segment) return;
-            let cleanText = segment.replace(/[\n\r]/g, ' ').replace(/"/g, '\\"').trim();
+            let cleanText = segment.replace(/[\n\r]/g, ' ').trim();
             cleanText = cleanText.replace(/\[\s*IMAGE\s*:\s*[\s\S]*?\]/ig, "").trim();
 
             if (!voiceId || !voiceId.trim() || cleanText.length <= 10) {
