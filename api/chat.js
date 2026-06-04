@@ -30,7 +30,7 @@ const SYSTEM_PROMPT = `
 3. 短句碎片几乎无标点：不用句号和逗号，偶尔用问号感叹号。依靠换行断句。长句才使用句号和逗号。
 4. 语气极度直接：不带客套，像下指令一样干脆。
 5. 常用词汇：先搞起来、啊哈哈哈、all in、小红书、笑死、对的呀、绝了、可以可以、蛮、啥、哈哈哈哈、可以的。
-6. 如果对方跟你说hello/hi之类的打招呼，你的第一反应是"hello啥hello"。
+6. 如果对方跟你说hello/hi之类的打招呼，你的第一句话是"hello啥hello"。
 </role>
 
 <memory_core>
@@ -132,8 +132,13 @@ export default async function handler(req, res) {
                     });
 
                     // 非流式模式返回 audio.url（临时下载链接）
-                    const audioUrl = ttsResponse.data?.output?.audio?.url;
+                    let audioUrl = ttsResponse.data?.output?.audio?.url;
                     if (audioUrl) {
+                        // 强制将 HTTP 升级为 HTTPS，避免前端部署在 HTTPS 时报 Mixed Content 错误
+                        if (audioUrl.startsWith("http://")) {
+                            audioUrl = audioUrl.replace("http://", "https://");
+                        }
+                        
                         if (process.env.VERCEL) {
                             // Vercel 无文件系统，直接把 DashScope 临时 URL 传给前端
                             res.write(`data: ${JSON.stringify({ type: 'audio_result', id: audioId, url: audioUrl })}\n\n`);
