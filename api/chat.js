@@ -115,26 +115,38 @@ export default async function handler(req, res) {
             const p = new Promise(async (resolve) => {
                 try {
                     const cleanApiKey = (process.env.LLM_API_KEY || "").replace(/["']/g, "").trim();
+                    // DashScope 原生 HTTP TTS API（纯 HTTP，不走 WebSocket）
                     const ttsResponse = await axios({
                         method: 'post',
-                        url: `${process.env.LLM_BASE_URL}/audio/speech`,
+                        url: 'https://dashscope.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer',
                         headers: {
                             'Authorization': `Bearer ${cleanApiKey}`,
                             'Content-Type': 'application/json',
                         },
                         data: {
                             model: 'cosyvoice-v3.5-flash',
-                            voice: voiceId.trim(),
-                            input: cleanText,
+                            input: {
+                                text: cleanText,
+                                voice: voiceId.trim(),
+                                format: 'mp3',
+                                sample_rate: 24000,
+                            },
                         },
-                        responseType: 'arraybuffer',
                         timeout: 60000,
                     });
 
-                    await fs.writeFile(audioPath, Buffer.from(ttsResponse.data));
-                    res.write(`data: ${JSON.stringify({ type: 'audio_result', id: audioId })}\n\n`);
+                    // 非流式模式返回 audio.url（临时下载链接）
+                    const audioUrl = ttsResponse.data?.output?.audio?.url;
+                    if (audioUrl) {
+                        const audioData = await axios({ url: audioUrl, responseType: 'arraybuffer', timeout: 30000 });
+                        await fs.writeFile(audioPath, Buffer.from(audioData.data));
+                        res.write(`data: ${JSON.stringify({ type: 'audio_result', id: audioId })}\n\n`);
+                    } else {
+                        console.error("TTS: no audio URL in response", JSON.stringify(ttsResponse.data).slice(0, 500));
+                        res.write(`data: ${JSON.stringify({ type: 'audio_error', id: audioId })}\n\n`);
+                    }
                 } catch (e) {
-                    console.error("TTS HTTP API error:", e.response?.status, e.response?.data ? Buffer.from(e.response.data).toString('utf8').slice(0, 500) : e.message);
+                    console.error("TTS HTTP API error:", e.response?.status, e.response?.data ? JSON.stringify(e.response.data).slice(0, 500) : e.message);
                     res.write(`data: ${JSON.stringify({ type: 'audio_error', id: audioId })}\n\n`);
                 }
                 resolve();
